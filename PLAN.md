@@ -127,7 +127,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 
 ## Fase 2: Algoritmo (funciones puras)
 
-### [ ] T3: Tipos de dominio, binary heap y Dijkstra de un tramo
+### [x] T3: Tipos de dominio, binary heap y Dijkstra de un tramo
 
 **Qué se construye:**
 - `types.ts` con las interfaces `Node`, `Edge`, `VehicleProfile`, `RouteRequest`, `RouteResult` y `RouteError`.
@@ -152,7 +152,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/algorithm/types.ts`, `min-heap.ts`, `dijkstra.ts` y sus `.spec.ts`.
 **Tamaño:** S.
 
-### [ ] T4: Restricciones de vehículo y códigos de error
+### [x] T4: Restricciones de vehículo y códigos de error
 
 **Qué se construye:**
 - Defaults de las aristas (`maxWeight` sin límite, `noHazardous` false, `trafficMultiplier` 1.0).
@@ -178,7 +178,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/algorithm/constraints.ts`, `find-route.ts` y sus `.spec.ts`.
 **Tamaño:** S.
 
-### [ ] T5: Hora pico y peso dependiente del tiempo
+### [x] T5: Hora pico y peso dependiente del tiempo
 
 **Qué se construye:**
 - `peak-hours.ts`:
@@ -206,7 +206,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/algorithm/peak-hours.ts`, `dijkstra.ts`, `find-route.ts` y sus `.spec.ts`.
 **Tamaño:** S.
 
-### [ ] T6: Ruta con varias paradas
+### [x] T6: Ruta con varias paradas
 
 **Qué se construye:**
 - `findRoute` recorre los tramos `origen → parada 1 → … → destino`.
@@ -233,9 +233,9 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Tamaño:** S.
 
 ### Checkpoint 2: Algoritmo
-- [ ] Todos los tests del algoritmo en verde, incluidos los 3 casos del README y el grafo de la imagen.
-- [ ] **Explicación del algoritmo**: recorrido paso a paso con el grafo del README, el heap y el reloj de la hora pico, para que lo entiendas y lo puedas defender.
-- [ ] Revisión contigo.
+- [x] Todos los tests del algoritmo en verde, incluidos los 3 casos del README y el grafo de la imagen (67/67 del algoritmo).
+- [x] **Explicación del algoritmo**: recorrido paso a paso con el grafo del README, el heap y el reloj de la hora pico, para que lo entiendas y lo puedas defender.
+- [x] Revisión contigo (PR de la fase 2).
 
 ---
 
