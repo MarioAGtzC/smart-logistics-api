@@ -1,18 +1,23 @@
 import { canTraverse } from './constraints';
 import { dijkstra, EdgeWeight } from './dijkstra';
-import { isPeak, parseClock, PeakWindow } from './peak-hours';
+import { formatClock, isPeak, parseClock, PeakWindow } from './peak-hours';
 import { Edge, RouteError, RouteRequest } from './types';
 
 export type FindRouteOutcome =
-  { path: string[]; totalCost: number } | { error: RouteError };
+  | { path: string[]; totalCost: number; arrivalTime: string }
+  | { error: RouteError };
 
+/** Visits origin, each waypoint in order, then destination, one Dijkstra leg per hop. */
 export function findRoute(
   edges: Edge[],
   request: RouteRequest,
   peakWindows: PeakWindow[],
 ): FindRouteOutcome {
-  const { originNodeId: origin, destinationNodeId: destination } = request;
-  const departure = parseClock(request.departureTime);
+  const stops = [
+    request.originNodeId,
+    ...(request.waypoints ?? []),
+    request.destinationNodeId,
+  ];
   // The multiplier applies only if the vehicle enters the edge during a peak window.
   const weight: EdgeWeight = (edge, enteredAt) =>
     isPeak(enteredAt, peakWindows)
@@ -20,7 +25,7 @@ export function findRoute(
       : edge.cost;
 
   const nodes = new Set(edges.flatMap((edge) => [edge.from, edge.to]));
-  const unknown = [origin, destination].find((node) => !nodes.has(node));
+  const unknown = stops.find((node) => !nodes.has(node));
   if (unknown !== undefined) {
     return {
       error: {
@@ -33,25 +38,45 @@ export function findRoute(
   const allowed = edges.filter((edge) =>
     canTraverse(edge, request.vehicleProfile),
   );
-  const leg = dijkstra(allowed, origin, destination, weight, departure);
-  if (leg) return { path: leg.path, totalCost: leg.cost };
+  const departure = parseClock(request.departureTime);
+  let clock = departure;
+  const path = [stops[0]];
 
+  for (let i = 1; i < stops.length; i++) {
+    const [from, to] = [stops[i - 1], stops[i]];
+    const leg = dijkstra(allowed, from, to, weight, clock);
+    if (!leg) {
+      return { error: legError(edges, allowed, from, to, weight, clock) };
+    }
+    // Each leg starts where the previous one ended; skip the shared node.
+    path.push(...leg.path.slice(1));
+    clock += leg.cost;
+  }
+
+  return {
+    path,
+    totalCost: clock - departure,
+    arrivalTime: formatClock(clock),
+  };
+}
+
+function legError(
+  edges: Edge[],
+  allowed: Edge[],
+  from: string,
+  to: string,
+  weight: EdgeWeight,
+  clock: number,
+): RouteError {
   // Only on failure: rerun without constraints to tell the two errors apart.
   if (
     allowed.length < edges.length &&
-    dijkstra(edges, origin, destination, weight, departure)
+    dijkstra(edges, from, to, weight, clock)
   ) {
     return {
-      error: {
-        code: 'ROUTE_BLOCKED_BY_CONSTRAINTS',
-        message: `No route from ${origin} to ${destination} for this vehicle (weight or hazardous-load restrictions)`,
-      },
+      code: 'ROUTE_BLOCKED_BY_CONSTRAINTS',
+      message: `No route from ${from} to ${to} for this vehicle (weight or hazardous-load restrictions)`,
     };
   }
-  return {
-    error: {
-      code: 'NO_ROUTE',
-      message: `No route from ${origin} to ${destination}`,
-    },
-  };
+  return { code: 'NO_ROUTE', message: `No route from ${from} to ${to}` };
 }

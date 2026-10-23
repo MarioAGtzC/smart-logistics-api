@@ -14,6 +14,13 @@ export function parseClock(clock: string): number {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+/** Minutes -> "HH:mm", rounded to the nearest minute and wrapped past midnight. */
+export function formatClock(minutes: number): string {
+  const m = Math.round(minutes) % MINUTES_PER_DAY;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+}
+
 /** "07:00-09:00,17:00-19:00" -> windows; an empty string means no peak hours. */
 export function parsePeakHours(spec: string): PeakWindow[] {
   if (spec === '') return [];

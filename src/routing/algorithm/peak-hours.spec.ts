@@ -1,4 +1,4 @@
-import { isPeak, parseClock, parsePeakHours } from './peak-hours';
+import { formatClock, isPeak, parseClock, parsePeakHours } from './peak-hours';
 
 const at = (clock: string) => parseClock(clock);
 
@@ -65,5 +65,17 @@ describe('isPeak', () => {
 
   it('is never peak without windows', () => {
     expect(isPeak(at('08:00'), [])).toBe(false);
+  });
+});
+
+describe('formatClock', () => {
+  it.each([
+    [410, '06:50'],
+    [0, '00:00'],
+    [519.5, '08:40'],
+    [1445, '00:05'],
+    [1439.6, '00:00'],
+  ])('%s minutes -> %s (rounded, modulo 24h)', (minutes, expected) => {
+    expect(formatClock(minutes)).toBe(expected);
   });
 });

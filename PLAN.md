@@ -206,7 +206,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/algorithm/peak-hours.ts`, `dijkstra.ts`, `find-route.ts` y sus `.spec.ts`.
 **Tamaño:** S.
 
-### [ ] T6: Ruta con varias paradas
+### [x] T6: Ruta con varias paradas
 
 **Qué se construye:**
 - `findRoute` recorre los tramos `origen → parada 1 → … → destino`.
