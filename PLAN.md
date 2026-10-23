@@ -233,9 +233,9 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Tamaño:** S.
 
 ### Checkpoint 2: Algoritmo
-- [ ] Todos los tests del algoritmo en verde, incluidos los 3 casos del README y el grafo de la imagen.
-- [ ] **Explicación del algoritmo**: recorrido paso a paso con el grafo del README, el heap y el reloj de la hora pico, para que lo entiendas y lo puedas defender.
-- [ ] Revisión contigo.
+- [x] Todos los tests del algoritmo en verde, incluidos los 3 casos del README y el grafo de la imagen (67/67 del algoritmo).
+- [x] **Explicación del algoritmo**: recorrido paso a paso con el grafo del README, el heap y el reloj de la hora pico, para que lo entiendas y lo puedas defender.
+- [x] Revisión contigo (PR de la fase 2).
 
 ---
 
