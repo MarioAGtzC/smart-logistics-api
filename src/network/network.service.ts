@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UploadNetworkDto } from './dto/upload-network.dto';
@@ -35,5 +35,17 @@ export class NetworkService {
       }
       return { id: graph.id };
     });
+  }
+
+  /** Loads a graph with its edges in upload order; 404 if it does not exist. */
+  async getGraph(id: string): Promise<GraphEntity> {
+    const graph = await this.graphs.findOneBy({ id });
+    if (!graph) throw new NotFoundException(`Graph ${id} not found`);
+    // Separate query, not a JOIN: a JOIN repeats the graph's nodes array on every edge row (OOM at 10k edges).
+    graph.edges = await this.graphs.manager.find(EdgeEntity, {
+      where: { graph: { id } },
+      order: { id: 'ASC' },
+    });
+    return graph;
   }
 }

@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EdgeEntity } from './entities/edge.entity';
@@ -123,5 +124,50 @@ describe('NetworkService.create', () => {
     await expect(
       service.create({ edges: [{ from: 'A', to: 'B', cost: 1 }] }),
     ).rejects.toThrow('insert failed');
+  });
+});
+
+describe('NetworkService.getGraph', () => {
+  const repository = {
+    findOneBy: jest.fn(),
+    manager: { find: jest.fn() },
+  };
+  let service: NetworkService;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    const module = await Test.createTestingModule({
+      providers: [
+        NetworkService,
+        { provide: getRepositoryToken(GraphEntity), useValue: repository },
+      ],
+    }).compile();
+    service = module.get(NetworkService);
+  });
+
+  it('loads the graph and then its edges in a separate query, ordered as uploaded', async () => {
+    const edges = [{ id: 1, from: 'A', to: 'B', cost: 1 }];
+    repository.findOneBy.mockResolvedValue({ id: GRAPH_ID, nodes: ['A', 'B'] });
+    repository.manager.find.mockResolvedValue(edges);
+
+    await expect(service.getGraph(GRAPH_ID)).resolves.toEqual({
+      id: GRAPH_ID,
+      nodes: ['A', 'B'],
+      edges,
+    });
+    expect(repository.findOneBy).toHaveBeenCalledWith({ id: GRAPH_ID });
+    // No JOIN: it would repeat the graph's nodes array on every edge row (OOM at 10k edges).
+    expect(repository.manager.find).toHaveBeenCalledWith(EdgeEntity, {
+      where: { graph: { id: GRAPH_ID } },
+      order: { id: 'ASC' },
+    });
+  });
+
+  it('throws NotFoundException (404) without querying edges when the graph does not exist', async () => {
+    repository.findOneBy.mockResolvedValue(null);
+
+    await expect(service.getGraph(GRAPH_ID)).rejects.toThrow(NotFoundException);
+    await expect(service.getGraph(GRAPH_ID)).rejects.toThrow(GRAPH_ID);
+    expect(repository.manager.find).not.toHaveBeenCalled();
   });
 });

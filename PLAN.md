@@ -273,7 +273,9 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/network/entities/graph.entity.ts`, `edge.entity.ts`, `src/network/dto/upload-network.dto.ts`, `network.service.ts`, `network.controller.ts`, `network.module.ts`, `src/migrations/*`.
 **Tamaño:** M.
 
-### [ ] T8: `GET /network/nodes/:id`
+### [x] T8: `GET /network/nodes/:id`
+
+**Ajuste al implementar:** cargar las aristas con `relations` (un JOIN) repetía el arreglo `nodes` del grafo en cada fila de arista. Con 10 000 aristas, la app se quedó sin memoria (más de 2 GB) y se cayó. `relationLoadStrategy: 'query'` no admite ordenar la relación en TypeORM 1.1 (error de SQL). `getGraph` hace ahora dos consultas simples: el grafo con `findOneBy` y sus aristas con `find` por `graph_id`, ordenadas por `id`. Verificado: 10 000 aristas en ~90 ms; `GET /network/nodes` responde en ~0.09 s.
 
 **Qué se construye:**
 - `NetworkService.getGraph(id)` carga el grafo con sus aristas.
