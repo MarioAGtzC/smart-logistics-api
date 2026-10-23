@@ -152,7 +152,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/algorithm/types.ts`, `min-heap.ts`, `dijkstra.ts` y sus `.spec.ts`.
 **Tamaño:** S.
 
-### [ ] T4: Restricciones de vehículo y códigos de error
+### [x] T4: Restricciones de vehículo y códigos de error
 
 **Qué se construye:**
 - Defaults de las aristas (`maxWeight` sin límite, `noHazardous` false, `trafficMultiplier` 1.0).
