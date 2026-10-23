@@ -6,11 +6,20 @@ export interface LegResult {
   cost: number;
 }
 
-/** Cheapest path on a directed graph with non-negative costs, or null if unreachable. */
+/** Cost of traversing an edge entered at `enteredAt` (minutes since midnight of the departure day). */
+export type EdgeWeight = (edge: Edge, enteredAt: number) => number;
+
+/**
+ * Cheapest path on a directed graph with non-negative weights, or null if unreachable.
+ * Costs are minutes, so the accumulated cost is also the clock: an edge's weight is
+ * evaluated at the time the vehicle enters it (startTime + cost so far).
+ */
 export function dijkstra(
   edges: Edge[],
   origin: string,
   destination: string,
+  weight: EdgeWeight = (edge) => edge.cost,
+  startTime = 0,
 ): LegResult | null {
   const outgoing = new Map<string, Edge[]>();
   for (const edge of edges) {
@@ -33,7 +42,7 @@ export function dijkstra(
     }
     const cost = best.get(node)!;
     for (const edge of outgoing.get(node) ?? []) {
-      const candidate = cost + edge.cost;
+      const candidate = cost + weight(edge, startTime + cost);
       if (candidate < (best.get(edge.to) ?? Infinity)) {
         best.set(edge.to, candidate);
         previous.set(edge.to, node);

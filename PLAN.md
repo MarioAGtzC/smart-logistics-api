@@ -178,7 +178,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/algorithm/constraints.ts`, `find-route.ts` y sus `.spec.ts`.
 **Tamaño:** S.
 
-### [ ] T5: Hora pico y peso dependiente del tiempo
+### [x] T5: Hora pico y peso dependiente del tiempo
 
 **Qué se construye:**
 - `peak-hours.ts`:
