@@ -241,7 +241,13 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 
 ## Fase 3: Redes (Postgres + caché)
 
-### [ ] T7: Entidades, migración y `POST /network/upload`
+### [x] T7: Entidades, migración y `POST /network/upload`
+
+**Ajustes al implementar:**
+- Las entidades se llaman `GraphEntity` y `EdgeEntity`, para no chocar con la interfaz `Edge` del algoritmo. La migración vive en `src/database/migrations/` (carpeta de T2).
+- Con 10 000 aristas, un solo `save` con cascade excedía el límite de Postgres de 65 535 parámetros por consulta (`500`). Ahora se usa una transacción explícita: se guarda el grafo y las aristas se insertan en lotes de 1000. Verificado con la base real: 10 000 aristas en ~1.6 s, y un fallo en el segundo lote deshace todo.
+- Un nombre de nodo con el carácter NUL (`\u0000`) daba `500`, porque Postgres lo rechaza en `text`. Ahora el DTO lo rechaza con `400` (`@NotContains`).
+- `nodes` se guarda en orden de primera aparición.
 
 **Qué se construye:**
 - Entidades `Graph` y `Edge` (relación 1-N con `ON DELETE CASCADE` e índice en `graph_id`).

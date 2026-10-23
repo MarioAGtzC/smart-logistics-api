@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { validate } from './config/env.validation';
 import { baseDatabaseOptions } from './database/database.options';
+import { NetworkModule } from './network/network.module';
 import { RoutingModule } from './routing/routing.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { RoutingModule } from './routing/routing.module';
         connection: { url: config.getOrThrow<string>('REDIS_URL') },
       }),
     }),
+    NetworkModule,
     RoutingModule,
   ],
 })
