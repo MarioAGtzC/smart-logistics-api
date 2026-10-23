@@ -127,7 +127,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 
 ## Fase 2: Algoritmo (funciones puras)
 
-### [ ] T3: Tipos de dominio, binary heap y Dijkstra de un tramo
+### [x] T3: Tipos de dominio, binary heap y Dijkstra de un tramo
 
 **Qué se construye:**
 - `types.ts` con las interfaces `Node`, `Edge`, `VehicleProfile`, `RouteRequest`, `RouteResult` y `RouteError`.
