@@ -95,11 +95,12 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `package.json`, `tsconfig.json`, `nest-cli.json`, `eslint.config.mjs`, `src/main.ts`, `src/app.module.ts`, `src/config/env.validation.ts`, `docker-compose.dev.yml`, `.env.example`.
 **Tamaño:** M.
 
-### [ ] T2: Conexiones a Postgres y Redis, y Swagger
+### [x] T2: Conexiones a Postgres y Redis, y Swagger
 
 **Qué se construye:**
-- `TypeOrmModule.forRootAsync` (`@nestjs/typeorm@11`): `autoLoadEntities`, sin `synchronize` y con `migrationsRun: true`.
-- `BullModule.forRoot` (`@nestjs/bullmq@11`) con la conexión a `REDIS_URL`.
+- `TypeOrmModule.forRootAsync` (`@nestjs/typeorm@11` + `typeorm@1`): `autoLoadEntities`, sin `synchronize` y con `migrationsRun: true`. Las opciones base se comparten con el CLI en `src/database/database.options.ts`.
+- `BullModule.forRoot` (`@nestjs/bullmq@11` + `bullmq@6` + `ioredis`, que en BullMQ 6 es opcional) con `connection: { url: REDIS_URL }`.
+- Se adelanta desde T10 el registro de la cola `route` en `RoutingModule`: sin una cola, BullMQ no abre ninguna conexión. Al arrancar se espera `queue.waitUntilReady()` con un límite de 5 s; si no responde, la app no arranca y el error es `Redis is unreachable (check REDIS_URL)`.
 - Límite del body (`BODY_LIMIT`, 2 MB por defecto) en `main.ts`, con la variable validada en `env.validation.ts`.
 - Swagger (`@nestjs/swagger@11`) con `SwaggerModule.setup('docs', …)` y el plugin del CLI en `nest-cli.json`.
 - Script para generar y ejecutar migraciones con el CLI de TypeORM.
@@ -109,10 +110,12 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 - `GET /docs` muestra Swagger UI y `GET /docs-json` devuelve la spec.
 
 **Pruebas:**
-- `env.validation.spec.ts`: `BODY_LIMIT` válido e inválido.
+- `env.validation.spec.ts`: `BODY_LIMIT` válido e inválido, y su valor por defecto.
+- `routing.module.spec.ts`: Redis listo; Redis no responde en 5 s; conexión rechazada.
+- Verificación manual: Postgres caído, la app reintenta unos 26 s y luego muestra `Unable to connect to the database`. Redis caído, falla en unos 5 s.
 
 **Dependencias:** T1.
-**Archivos:** `src/app.module.ts`, `src/main.ts`, `src/config/env.validation.ts`, `nest-cli.json`, `package.json`, `.env.example`.
+**Archivos:** `src/app.module.ts`, `src/main.ts`, `src/config/env.validation.ts`, `src/database/database.options.ts`, `src/database/data-source.ts`, `src/routing/routing.module.ts`, `nest-cli.json`, `package.json`, `.env.example`.
 **Tamaño:** S.
 
 ### Checkpoint 1: Base
@@ -319,7 +322,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
   - `waypoints` opcional, lista de strings.
   - `vehicleProfile` opcional y anidado: `type` string, `weight >= 0`, `hazardous` booleano.
   - `departureTime` obligatorio, formato `HH:mm` entre 00:00 y 23:59.
-- `BullModule.registerQueue({ name: 'route' })`.
+- La cola `route` ya está registrada desde T2, en `RoutingModule`.
 - El servicio comprueba que el grafo exista (404) y encola `{ graphId, request }` con:
   - `jobId: job-<uuid>`.
   - `attempts: 3` con espera exponencial.
@@ -505,7 +508,8 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 |---|---|---|
 | Al terminar la hora pico, salir más tarde puede hacerte llegar antes. Con eso, Dijkstra sin esperas puede no dar el óptimo en casos de borde | Medio | Documentarlo como limitación conocida y agregar un test que fije el comportamiento elegido |
 | Instalar sin versión un paquete `@nestjs/*` trae la v12 (solo ESM) y rompe Jest en CommonJS | Alto | Instalar siempre la línea de Nest 11 (`npm view <pkg>@<major> type` debe estar vacío) |
-| Los workers de BullMQ necesitan `maxRetriesPerRequest: null` en la conexión de Redis | Medio | Verificarlo en T2/T11 contra la documentación de BullMQ |
+| Los workers de BullMQ necesitan `maxRetriesPerRequest: null` en la conexión de Redis | Bajo | Verificado en la documentación de BullMQ: solo hace falta si se pasa una instancia de ioredis propia. Como pasamos opciones (`{ url }`), BullMQ lo configura solo. Confirmarlo en T11 |
+| Si Redis se cae en ejecución, `queue.add` puede quedarse esperando (por defecto, 20 reintentos por comando) y el `POST /route/optimize` tardaría en responder | Medio | Revisarlo en T10 |
 | El repo está en una ruta de OneDrive (el usuario confirma que no sincroniza) | Bajo | Si `npm install` se vuelve lento o da errores de archivos bloqueados (`EPERM`/`EBUSY`), revisar OneDrive primero |
 | Los tests e2e son inestables por el polling asíncrono | Bajo | Polling con tiempo límite y BD y cola aisladas para test |
 | `nest new` en un repo que ya tiene archivos | Bajo | Generar en una carpeta temporal y mover, o usar `--skip-git` con cuidado de no sobrescribir `README.md` ni `.gitignore` |

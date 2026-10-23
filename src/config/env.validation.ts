@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsInt, IsUrl, Max, Min, validateSync } from 'class-validator';
+import { IsInt, IsUrl, Matches, Max, Min, validateSync } from 'class-validator';
 
 export class EnvironmentVariables {
   @IsInt()
@@ -12,6 +12,10 @@ export class EnvironmentVariables {
 
   @IsUrl({ protocols: ['redis', 'rediss'], require_tld: false })
   REDIS_URL: string;
+
+  // Express's 100kb default is too small for large graphs.
+  @Matches(/^\d+(kb|mb)$/i)
+  BODY_LIMIT: string = '2mb';
 }
 
 export function validate(config: Record<string, unknown>) {

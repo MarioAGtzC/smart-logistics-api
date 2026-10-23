@@ -29,4 +29,18 @@ describe('validate (env)', () => {
   it('rejects an out-of-range PORT', () => {
     expect(() => validate({ ...valid, PORT: '70000' })).toThrow(/PORT/);
   });
+
+  it('defaults BODY_LIMIT to 2mb', () => {
+    expect(validate(valid).BODY_LIMIT).toBe('2mb');
+  });
+
+  it.each(['500kb', '5mb', '10MB'])('accepts BODY_LIMIT %s', (limit) => {
+    expect(validate({ ...valid, BODY_LIMIT: limit }).BODY_LIMIT).toBe(limit);
+  });
+
+  it.each(['lots', '5', '5gb', 'mb'])('rejects BODY_LIMIT %s', (limit) => {
+    expect(() => validate({ ...valid, BODY_LIMIT: limit })).toThrow(
+      /BODY_LIMIT/,
+    );
+  });
 });
