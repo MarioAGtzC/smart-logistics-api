@@ -119,9 +119,9 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Tamaño:** S.
 
 ### Checkpoint 1: Base
-- [ ] Lint, build y tests en verde.
-- [ ] La BD y Redis corren en Docker; la app se conecta y muestra `/docs`.
-- [ ] Revisión contigo antes de seguir.
+- [x] Lint, build y tests en verde (16/16).
+- [x] La BD y Redis corren en Docker; la app se conecta y muestra `/docs`.
+- [x] Revisión contigo antes de seguir (PR de la fase 1).
 
 ---
 
