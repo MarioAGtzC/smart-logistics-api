@@ -292,7 +292,12 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `network.controller.ts`, `network.service.ts`, `dto/network-nodes.response.dto.ts`, spec.
 **Tamaño:** XS.
 
-### [ ] T9: Caché del grafo en Redis
+### [x] T9: Caché del grafo en Redis
+
+**Ajustes al implementar:**
+- Versiones: `@nestjs/cache-manager@3` (última para Nest 11), `cache-manager@7`, y **`keyv@5` + `@keyv/redis@5`**. Con Keyv 6, Nest no reconoce el store (busca la propiedad `opts`, que Keyv 6 ya no tiene). Lo envolvía en un segundo Keyv sin listener de errores, y la app **se caía al apagar Redis**.
+- El store vive en `src/network/graph-cache.store.ts`. Tiene un listener de `error` que solo deja una advertencia, y `disableOfflineQueue: true`, para que con Redis caído los comandos fallen de inmediato en vez de esperar la reconexión.
+- Verificado con la app real: con Postgres apagado, un grafo en caché responde 200 en ~3 ms. Con Redis apagado, la API sigue respondiendo desde Postgres sin esperas y Redis se reconecta solo.
 
 **Qué se construye:**
 - `CacheModule.registerAsync` con el store `@keyv/redis`.

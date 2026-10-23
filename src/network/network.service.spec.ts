@@ -1,3 +1,4 @@
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -29,6 +30,7 @@ describe('NetworkService.create', () => {
       providers: [
         NetworkService,
         { provide: getRepositoryToken(GraphEntity), useValue: repository },
+        { provide: CACHE_MANAGER, useValue: {} },
       ],
     }).compile();
     service = module.get(NetworkService);
@@ -127,11 +129,14 @@ describe('NetworkService.create', () => {
   });
 });
 
-describe('NetworkService.getGraph', () => {
+describe('NetworkService.getGraph (cache-aside on Redis)', () => {
   const repository = {
     findOneBy: jest.fn(),
     manager: { find: jest.fn() },
   };
+  const cache = { get: jest.fn(), set: jest.fn() };
+  const edges = [{ id: 1, from: 'A', to: 'B', cost: 1 }];
+  const graph = { id: GRAPH_ID, nodes: ['A', 'B'], edges };
   let service: NetworkService;
 
   beforeEach(async () => {
@@ -140,34 +145,47 @@ describe('NetworkService.getGraph', () => {
       providers: [
         NetworkService,
         { provide: getRepositoryToken(GraphEntity), useValue: repository },
+        { provide: CACHE_MANAGER, useValue: cache },
       ],
     }).compile();
     service = module.get(NetworkService);
   });
 
-  it('loads the graph and then its edges in a separate query, ordered as uploaded', async () => {
-    const edges = [{ id: 1, from: 'A', to: 'B', cost: 1 }];
+  it('returns a cached graph without touching Postgres', async () => {
+    cache.get.mockResolvedValue(graph);
+
+    await expect(service.getGraph(GRAPH_ID)).resolves.toEqual(graph);
+    expect(cache.get).toHaveBeenCalledWith(`graph:${GRAPH_ID}`);
+    expect(repository.findOneBy).not.toHaveBeenCalled();
+    expect(repository.manager.find).not.toHaveBeenCalled();
+  });
+
+  it('on a miss, loads the graph and then its edges in a separate query, and caches it for 1 h', async () => {
+    cache.get.mockResolvedValue(undefined);
     repository.findOneBy.mockResolvedValue({ id: GRAPH_ID, nodes: ['A', 'B'] });
     repository.manager.find.mockResolvedValue(edges);
 
-    await expect(service.getGraph(GRAPH_ID)).resolves.toEqual({
-      id: GRAPH_ID,
-      nodes: ['A', 'B'],
-      edges,
-    });
+    await expect(service.getGraph(GRAPH_ID)).resolves.toEqual(graph);
     expect(repository.findOneBy).toHaveBeenCalledWith({ id: GRAPH_ID });
     // No JOIN: it would repeat the graph's nodes array on every edge row (OOM at 10k edges).
     expect(repository.manager.find).toHaveBeenCalledWith(EdgeEntity, {
       where: { graph: { id: GRAPH_ID } },
       order: { id: 'ASC' },
     });
+    expect(cache.set).toHaveBeenCalledWith(
+      `graph:${GRAPH_ID}`,
+      graph,
+      60 * 60 * 1000,
+    );
   });
 
-  it('throws NotFoundException (404) without querying edges when the graph does not exist', async () => {
+  it('throws NotFoundException (404) and caches nothing when the graph does not exist', async () => {
+    cache.get.mockResolvedValue(undefined);
     repository.findOneBy.mockResolvedValue(null);
 
     await expect(service.getGraph(GRAPH_ID)).rejects.toThrow(NotFoundException);
     await expect(service.getGraph(GRAPH_ID)).rejects.toThrow(GRAPH_ID);
     expect(repository.manager.find).not.toHaveBeenCalled();
+    expect(cache.set).not.toHaveBeenCalled();
   });
 });
