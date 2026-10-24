@@ -319,9 +319,9 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Tamaño:** S.
 
 ### Checkpoint 3: Redes
-- [ ] Desde Swagger: subir el grafo del README y leer sus nodos.
-- [ ] Con `redis-cli KEYS graph:*` se ve la clave después de leer el grafo.
-- [ ] Revisión contigo.
+- [x] Desde Swagger: subir el grafo del README y leer sus nodos (201 y luego 200 con `["A","B","C","D","E"]`).
+- [x] Con `redis-cli KEYS graph:*` se ve la clave después de leer el grafo.
+- [x] Revisión contigo (PR de la fase 3).
 
 ---
 
