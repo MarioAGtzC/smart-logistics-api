@@ -1,12 +1,31 @@
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
+import { NetworkModule } from '../network/network.module';
+import { ROUTE_QUEUE } from './routing.constants';
+import { RoutingController } from './routing.controller';
+import { RoutingService } from './routing.service';
 
-export const ROUTE_QUEUE = 'route';
 const REDIS_READY_TIMEOUT_MS = 5000;
 
 @Module({
-  imports: [BullModule.registerQueue({ name: ROUTE_QUEUE })],
+  imports: [
+    NetworkModule,
+    BullModule.registerQueueAsync({
+      name: ROUTE_QUEUE,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        // Producer side: with Redis down, add() throws (-> 503) instead of waiting to reconnect.
+        connection: {
+          url: config.getOrThrow<string>('REDIS_URL'),
+          enableOfflineQueue: false,
+        },
+      }),
+    }),
+  ],
+  controllers: [RoutingController],
+  providers: [RoutingService],
 })
 export class RoutingModule implements OnApplicationBootstrap {
   constructor(@InjectQueue(ROUTE_QUEUE) private readonly queue: Queue) {}

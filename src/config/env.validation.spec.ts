@@ -43,4 +43,14 @@ describe('validate (env)', () => {
       /BODY_LIMIT/,
     );
   });
+
+  it('defaults JOB_RETENTION_SECONDS to 86400 (24 h)', () => {
+    expect(validate(valid).JOB_RETENTION_SECONDS).toBe(86400);
+  });
+
+  it.each(['0', '-5', 'day'])('rejects JOB_RETENTION_SECONDS %s', (value) => {
+    expect(() => validate({ ...valid, JOB_RETENTION_SECONDS: value })).toThrow(
+      /JOB_RETENTION_SECONDS/,
+    );
+  });
 });

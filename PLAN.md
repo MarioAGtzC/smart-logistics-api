@@ -34,7 +34,7 @@ Cada tarea termina en **un commit**, para que el historial que revisarán quede 
 |---|---|---|---|
 | POST | `/network/upload` | 201 `{ id }` | 400 |
 | GET | `/network/nodes/:id` | 200 `{ graphId, nodes[] }` | 400, 404 |
-| POST | `/route/optimize/:id` | 202 `{ jobId }` | 400, 404 |
+| POST | `/route/optimize/:id` | 202 `{ jobId }` | 400, 404, 503 (Redis caído) |
 | GET | `/route/status/:jobId` | 200 `{ jobId, status, result? , error? }` | 404 |
 | GET | `/docs`, `/docs-json` | Swagger UI / spec | — |
 
@@ -327,7 +327,12 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 
 ## Fase 4: Rutas asíncronas
 
-### [ ] T10: `POST /route/optimize/:id`
+### [x] T10: `POST /route/optimize/:id`
+
+**Ajustes al implementar:**
+- Con Redis caído responde **503** en milisegundos (patrón oficial de BullMQ: `enableOfflineQueue: false` en la conexión de la cola). Sin eso, `queue.add` se habría quedado esperando. Verificado: 503 en 7–26 ms, y 202 otra vez al volver Redis.
+- `waypoints` admite como máximo 100 paradas (cada una es un Dijkstra en el worker). `JOB_RETENTION_SECONDS` (24 h por defecto) se valida al arrancar.
+- `ROUTE_QUEUE` vive en `routing.constants.ts` para evitar un import circular entre el módulo y el servicio.
 
 **Qué se construye:**
 - `OptimizeRouteDto`:
@@ -522,7 +527,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 | Al terminar la hora pico, salir más tarde puede hacerte llegar antes. Con eso, Dijkstra sin esperas puede no dar el óptimo en casos de borde | Medio | Documentarlo como limitación conocida y agregar un test que fije el comportamiento elegido |
 | Instalar sin versión un paquete `@nestjs/*` trae la v12 (solo ESM) y rompe Jest en CommonJS | Alto | Instalar siempre la línea de Nest 11 (`npm view <pkg>@<major> type` debe estar vacío) |
 | Los workers de BullMQ necesitan `maxRetriesPerRequest: null` en la conexión de Redis | Bajo | Verificado en la documentación de BullMQ: solo hace falta si se pasa una instancia de ioredis propia. Como pasamos opciones (`{ url }`), BullMQ lo configura solo. Confirmarlo en T11 |
-| Si Redis se cae en ejecución, `queue.add` puede quedarse esperando (por defecto, 20 reintentos por comando) y el `POST /route/optimize` tardaría en responder | Medio | Revisarlo en T10 |
+| ~~Si Redis se cae en ejecución, `queue.add` puede quedarse esperando~~ | — | **Resuelto en T10:** `enableOfflineQueue: false` en la cola; responde 503 al instante |
 | El repo está en una ruta de OneDrive (el usuario confirma que no sincroniza) | Bajo | Si `npm install` se vuelve lento o da errores de archivos bloqueados (`EPERM`/`EBUSY`), revisar OneDrive primero |
 | Los tests e2e son inestables por el polling asíncrono | Bajo | Polling con tiempo límite y BD y cola aisladas para test |
 | `nest new` en un repo que ya tiene archivos | Bajo | Generar en una carpeta temporal y mover, o usar `--skip-git` con cuidado de no sobrescribir `README.md` ni `.gitignore` |

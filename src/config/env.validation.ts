@@ -16,6 +16,11 @@ export class EnvironmentVariables {
   // Express's 100kb default is too small for large graphs.
   @Matches(/^\d+(kb|mb)$/i)
   BODY_LIMIT: string = '2mb';
+
+  /** How long finished route jobs stay queryable via GET /route/status. */
+  @IsInt()
+  @Min(1)
+  JOB_RETENTION_SECONDS: number = 86400;
 }
 
 export function validate(config: Record<string, unknown>) {
