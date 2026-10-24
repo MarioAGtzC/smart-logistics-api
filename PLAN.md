@@ -429,9 +429,9 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Tamaño:** S.
 
 ### Checkpoint 4: Funcionalidad completa
-- [ ] Desde Swagger salen los 3 casos del README de punta a punta, más un caso con error (`FAILED` con su código).
-- [ ] Todos los tests unitarios en verde.
-- [ ] Revisión contigo.
+- [x] Desde Swagger salen los 3 casos del README de punta a punta, más un caso con error (`FAILED` con su código): caso 1 `A→C→D→E` 30, casos 2 y 3 `A→B→D→E` 32, camión de 9000 kg `ROUTE_BLOCKED_BY_CONSTRAINTS`.
+- [x] Todos los tests unitarios en verde (166/166).
+- [x] Revisión contigo (PR de la fase 4).
 
 ---
 
