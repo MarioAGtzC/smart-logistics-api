@@ -1,5 +1,14 @@
 import { plainToInstance } from 'class-transformer';
-import { IsInt, IsUrl, Matches, Max, Min, validateSync } from 'class-validator';
+import {
+  IsInt,
+  IsString,
+  IsUrl,
+  Matches,
+  Max,
+  Min,
+  validateSync,
+} from 'class-validator';
+import { parsePeakHours } from '../routing/algorithm/peak-hours';
 
 export class EnvironmentVariables {
   @IsInt()
@@ -21,6 +30,15 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   JOB_RETENTION_SECONDS: number = 86400;
+
+  /** Comma-separated [start, end) windows; empty means no peak hours. Checked by parsePeakHours below. */
+  @IsString()
+  PEAK_HOURS: string = '07:00-09:00,17:00-19:00';
+
+  /** Route jobs a worker processes in parallel. */
+  @IsInt()
+  @Min(1)
+  WORKER_CONCURRENCY: number = 4;
 }
 
 export function validate(config: Record<string, unknown>) {
@@ -31,5 +49,7 @@ export function validate(config: Record<string, unknown>) {
   if (errors.length > 0) {
     throw new Error(`Invalid environment variables:\n${errors.toString()}`);
   }
+  // Same parser the worker uses, so the rules live in one place; its message names PEAK_HOURS.
+  parsePeakHours(validated.PEAK_HOURS);
   return validated;
 }

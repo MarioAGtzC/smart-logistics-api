@@ -330,7 +330,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 ### [x] T10: `POST /route/optimize/:id`
 
 **Ajustes al implementar:**
-- Con Redis caído responde **503** en milisegundos (patrón oficial de BullMQ: `enableOfflineQueue: false` en la conexión de la cola). Sin eso, `queue.add` se habría quedado esperando. Verificado: 503 en 7–26 ms, y 202 otra vez al volver Redis.
+- Con Redis caído responde **503** en milisegundos. En T10 se hizo con `enableOfflineQueue: false` en la cola, pero el worker de T11 hereda esa conexión, y BullMQ recomienda que el worker sí espere la reconexión. **Desde T11**, cola y worker comparten la conexión normal, y el servicio comprueba que el cliente esté `ready` (`queue.getBackend().client.status`, API de BullMQ 6) antes de `add`. Verificado en ambos casos: 503 en milisegundos, y 202 otra vez al volver Redis.
 - `waypoints` admite como máximo 100 paradas (cada una es un Dijkstra en el worker). `JOB_RETENTION_SECONDS` (24 h por defecto) se valida al arrancar.
 - `ROUTE_QUEUE` vive en `routing.constants.ts` para evitar un import circular entre el módulo y el servicio.
 
@@ -360,7 +360,13 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/dto/optimize-route.dto.ts`, `routing.controller.ts`, `routing.service.ts`, `routing.module.ts`, spec.
 **Tamaño:** M.
 
-### [ ] T11: Worker `RouteProcessor`
+### [x] T11: Worker `RouteProcessor`
+
+**Ajustes al implementar:**
+- Las opciones de `@Processor(...)` se evalúan al importar el archivo, antes de cargar el `.env`. Por eso la concurrencia se aplica en `onApplicationBootstrap` (`worker.concurrency = WORKER_CONCURRENCY`, 4 por defecto). `PEAK_HOURS` se valida al arrancar con el mismo `parsePeakHours` del algoritmo.
+- El worker usa la conexión compartida, con cola offline, para esperar a Redis. El fallo rápido del productor pasó al servicio (ver T10).
+- `durationMs` mide solo `findRoute` y se redondea a microsegundos. El tipo `Edge` del algoritmo acepta `maxWeight: null`, como se guarda en la base.
+- Verificado con la app real: los 2 jobs pendientes de T10 se procesaron al arrancar. El caso 1 da `A→C→D→E`, 30. `INVALID_NODE` y `ROUTE_BLOCKED_BY_CONSTRAINTS` quedan `completed` con `{ error }` y `attemptsMade = 1`. Con Postgres caído y el grafo fuera de caché, el job queda `failed` tras 3 intentos (~3 s). Con Redis caído el worker sobrevive y reanuda solo. `failedReason` puede quedar vacío (el `AggregateError` de `pg` no tiene mensaje); T12 expone `INTERNAL_ERROR` con un mensaje genérico.
 
 **Qué se construye:**
 - `@Processor('route')` que extiende `WorkerHost`, con concurrencia `WORKER_CONCURRENCY`.

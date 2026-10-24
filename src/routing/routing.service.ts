@@ -28,6 +28,11 @@ export class RoutingService {
     // Also warms the graph cache for the worker.
     await this.network.getGraph(graphId);
 
+    // The queue shares the worker's connection, whose offline queue would make add() wait for a
+    // reconnect; check the connection first so a Redis outage answers 503 at once.
+    const redis = await this.queue.getBackend().client;
+    if (redis.status !== 'ready') throw this.unavailable();
+
     // BullMQ rejects ids that contain ':' or are all digits; the prefix avoids both.
     const jobId = `job-${randomUUID()}`;
     const retention = {
@@ -47,10 +52,14 @@ export class RoutingService {
         },
       );
     } catch {
-      throw new ServiceUnavailableException(
-        'Route queue is unavailable, try again later',
-      );
+      throw this.unavailable();
     }
     return { jobId };
+  }
+
+  private unavailable() {
+    return new ServiceUnavailableException(
+      'Route queue is unavailable, try again later',
+    );
   }
 }

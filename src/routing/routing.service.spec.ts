@@ -16,11 +16,16 @@ const request: OptimizeRouteDto = {
 
 describe('RoutingService.enqueue', () => {
   const network = { getGraph: jest.fn() };
-  const queue = { add: jest.fn() };
+  const redis = { status: 'ready' };
+  const queue = {
+    add: jest.fn(),
+    getBackend: () => ({ client: Promise.resolve(redis) }),
+  };
   let service: RoutingService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    redis.status = 'ready';
     network.getGraph.mockResolvedValue({ id: GRAPH_ID });
     queue.add.mockResolvedValue({});
     const module = await Test.createTestingModule({
@@ -71,12 +76,21 @@ describe('RoutingService.enqueue', () => {
     expect(queue.add).not.toHaveBeenCalled();
   });
 
-  it('answers 503 instead of hanging when Redis rejects the job', async () => {
-    queue.add.mockRejectedValue(
-      new Error(
-        "Stream isn't writeable and enableOfflineQueue options is false",
-      ),
-    );
+  it.each(['reconnecting', 'connecting', 'end'])(
+    'answers 503 without calling add when the Redis connection is %s',
+    async (status) => {
+      redis.status = status;
+
+      await expect(service.enqueue(GRAPH_ID, request)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+      // add() would wait for the reconnect: the shared connection keeps an offline queue for the worker.
+      expect(queue.add).not.toHaveBeenCalled();
+    },
+  );
+
+  it('answers 503 when Redis rejects the job', async () => {
+    queue.add.mockRejectedValue(new Error('Connection is closed.'));
 
     await expect(service.enqueue(GRAPH_ID, request)).rejects.toThrow(
       ServiceUnavailableException,
