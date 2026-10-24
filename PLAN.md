@@ -393,7 +393,13 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/route.processor.ts`, spec, `routing.module.ts`.
 **Tamaño:** S.
 
-### [ ] T12: `GET /route/status/:jobId`
+### [x] T12: `GET /route/status/:jobId`
+
+**Ajustes al implementar:**
+- Solo se aceptan ids con formato `job-<uuid>` (los que emite la API); cualquier otro da 404 sin consultar Redis. BullMQ arma la clave como `bull:route:<id>`, y un id como `meta` apuntaría a otra estructura interna de la cola.
+- `getState()` también puede devolver `'unknown'`, que se trata como 404. Con Redis caído responde 503, con la misma comprobación que el encolado.
+- Un job en espera de reintento queda `delayed` y se muestra `PENDING`. `INTERNAL_ERROR` lleva un mensaje genérico, sin detalles internos.
+- Verificado con la app real: upload → optimize → `PENDING` (cola pausada) → `COMPLETED` con `A→C→D→E`. `NO_ROUTE` sale como `FAILED` con su código. Con Postgres caído: `PENDING` durante los reintentos y luego `FAILED` / `INTERNAL_ERROR`. 404 para ids desconocidos o mal formados. `PROCESSING` dura milisegundos y está cubierto por la prueba unitaria.
 
 **Qué se construye:**
 - `queue.getJob(jobId)` + `job.getState()`, con este mapeo:

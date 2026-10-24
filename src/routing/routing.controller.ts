@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { JobStatusResponseDto } from './dto/job-status.response.dto';
 import { OptimizeRouteDto } from './dto/optimize-route.dto';
 import { RoutingService } from './routing.service';
 
@@ -21,5 +23,11 @@ export class RoutingController {
     @Body() dto: OptimizeRouteDto,
   ): Promise<{ jobId: string }> {
     return this.routing.enqueue(id, dto);
+  }
+
+  /** Status of a route job: PENDING, PROCESSING, COMPLETED (with result) or FAILED (with error). */
+  @Get('status/:jobId')
+  status(@Param('jobId') jobId: string): Promise<JobStatusResponseDto> {
+    return this.routing.getStatus(jobId);
   }
 }

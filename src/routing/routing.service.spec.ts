@@ -97,3 +97,73 @@ describe('RoutingService.enqueue', () => {
     );
   });
 });
+
+describe('RoutingService.getStatus', () => {
+  const JOB_ID = 'job-8e244475-cea4-408f-9545-26842a6cae42';
+  const redis = { status: 'ready' };
+  const job = {
+    getState: jest.fn(),
+    returnvalue: undefined as unknown,
+  };
+  const queue = {
+    getJob: jest.fn(),
+    getBackend: () => ({ client: Promise.resolve(redis) }),
+  };
+  let service: RoutingService;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    redis.status = 'ready';
+    queue.getJob.mockResolvedValue(job);
+    const module = await Test.createTestingModule({
+      providers: [
+        RoutingService,
+        { provide: NetworkService, useValue: {} },
+        { provide: getQueueToken(ROUTE_QUEUE), useValue: queue },
+        { provide: ConfigService, useValue: {} },
+      ],
+    }).compile();
+    service = module.get(RoutingService);
+  });
+
+  it('maps the BullMQ state and return value', async () => {
+    job.getState.mockResolvedValue('completed');
+    job.returnvalue = { error: { code: 'NO_ROUTE', message: 'x' } };
+
+    await expect(service.getStatus(JOB_ID)).resolves.toEqual({
+      jobId: JOB_ID,
+      status: 'FAILED',
+      error: { code: 'NO_ROUTE', message: 'x' },
+    });
+    expect(queue.getJob).toHaveBeenCalledWith(JOB_ID);
+  });
+
+  it('404 when the job does not exist or has expired', async () => {
+    queue.getJob.mockResolvedValue(undefined);
+
+    await expect(service.getStatus(JOB_ID)).rejects.toThrow(NotFoundException);
+  });
+
+  it("404 when BullMQ reports the state as 'unknown'", async () => {
+    job.getState.mockResolvedValue('unknown');
+
+    await expect(service.getStatus(JOB_ID)).rejects.toThrow(NotFoundException);
+  });
+
+  it.each(['meta', 'job-123', 'abc:def', ''])(
+    '404 without querying Redis for a malformed id %p',
+    async (id) => {
+      await expect(service.getStatus(id)).rejects.toThrow(NotFoundException);
+      expect(queue.getJob).not.toHaveBeenCalled();
+    },
+  );
+
+  it('503 when the Redis connection is not ready', async () => {
+    redis.status = 'reconnecting';
+
+    await expect(service.getStatus(JOB_ID)).rejects.toThrow(
+      ServiceUnavailableException,
+    );
+    expect(queue.getJob).not.toHaveBeenCalled();
+  });
+});
