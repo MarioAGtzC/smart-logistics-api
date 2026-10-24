@@ -7,8 +7,8 @@ export interface Edge {
   to: string;
   /** Travel time in minutes. */
   cost: number;
-  /** Max vehicle weight allowed; no limit when absent. */
-  maxWeight?: number;
+  /** Max vehicle weight allowed; no limit when absent or null (as stored). */
+  maxWeight?: number | null;
   /** Hazardous loads are banned when true; defaults to false. */
   noHazardous?: boolean;
   /** Cost multiplier during peak hours; defaults to 1. */

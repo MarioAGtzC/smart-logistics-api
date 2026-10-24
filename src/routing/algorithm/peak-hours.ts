@@ -1,5 +1,6 @@
 const MINUTES_PER_DAY = 1440;
-const CLOCK = /^([01]\d|2[0-3]):([0-5]\d)$/;
+/** "HH:mm", 00:00-23:59. */
+export const CLOCK = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 /** Minutes since midnight; a window with start > end crosses midnight. */
 export interface PeakWindow {

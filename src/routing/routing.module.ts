@@ -1,12 +1,23 @@
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { Queue } from 'bullmq';
+import { NetworkModule } from '../network/network.module';
+import { RouteProcessor } from './route.processor';
+import { ROUTE_QUEUE } from './routing.constants';
+import { RoutingController } from './routing.controller';
+import { RoutingService } from './routing.service';
 
-export const ROUTE_QUEUE = 'route';
 const REDIS_READY_TIMEOUT_MS = 5000;
 
 @Module({
-  imports: [BullModule.registerQueue({ name: ROUTE_QUEUE })],
+  imports: [
+    NetworkModule,
+    // Shared forRoot connection: the worker needs ioredis' offline queue to wait out a Redis
+    // outage. RoutingService checks the connection before add() to fail fast with 503 instead.
+    BullModule.registerQueue({ name: ROUTE_QUEUE }),
+  ],
+  controllers: [RoutingController],
+  providers: [RoutingService, RouteProcessor],
 })
 export class RoutingModule implements OnApplicationBootstrap {
   constructor(@InjectQueue(ROUTE_QUEUE) private readonly queue: Queue) {}

@@ -43,4 +43,35 @@ describe('validate (env)', () => {
       /BODY_LIMIT/,
     );
   });
+
+  it('defaults JOB_RETENTION_SECONDS to 86400 (24 h)', () => {
+    expect(validate(valid).JOB_RETENTION_SECONDS).toBe(86400);
+  });
+
+  it.each(['0', '-5', 'day'])('rejects JOB_RETENTION_SECONDS %s', (value) => {
+    expect(() => validate({ ...valid, JOB_RETENTION_SECONDS: value })).toThrow(
+      /JOB_RETENTION_SECONDS/,
+    );
+  });
+
+  it('defaults PEAK_HOURS to 07:00-09:00,17:00-19:00 and accepts an empty value', () => {
+    expect(validate(valid).PEAK_HOURS).toBe('07:00-09:00,17:00-19:00');
+    expect(validate({ ...valid, PEAK_HOURS: '' }).PEAK_HOURS).toBe('');
+  });
+
+  it.each(['7-9', '07:00', '10:00-10:00', '07:00-09:00,'])(
+    'rejects PEAK_HOURS %s',
+    (value) => {
+      expect(() => validate({ ...valid, PEAK_HOURS: value })).toThrow(
+        /PEAK_HOURS/,
+      );
+    },
+  );
+
+  it('defaults WORKER_CONCURRENCY to 4 and rejects 0', () => {
+    expect(validate(valid).WORKER_CONCURRENCY).toBe(4);
+    expect(() => validate({ ...valid, WORKER_CONCURRENCY: '0' })).toThrow(
+      /WORKER_CONCURRENCY/,
+    );
+  });
 });

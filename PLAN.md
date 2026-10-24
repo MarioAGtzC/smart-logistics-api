@@ -34,7 +34,7 @@ Cada tarea termina en **un commit**, para que el historial que revisarán quede 
 |---|---|---|---|
 | POST | `/network/upload` | 201 `{ id }` | 400 |
 | GET | `/network/nodes/:id` | 200 `{ graphId, nodes[] }` | 400, 404 |
-| POST | `/route/optimize/:id` | 202 `{ jobId }` | 400, 404 |
+| POST | `/route/optimize/:id` | 202 `{ jobId }` | 400, 404, 503 (Redis caído) |
 | GET | `/route/status/:jobId` | 200 `{ jobId, status, result? , error? }` | 404 |
 | GET | `/docs`, `/docs-json` | Swagger UI / spec | — |
 
@@ -327,7 +327,12 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 
 ## Fase 4: Rutas asíncronas
 
-### [ ] T10: `POST /route/optimize/:id`
+### [x] T10: `POST /route/optimize/:id`
+
+**Ajustes al implementar:**
+- Con Redis caído responde **503** en milisegundos. En T10 se hizo con `enableOfflineQueue: false` en la cola, pero el worker de T11 hereda esa conexión, y BullMQ recomienda que el worker sí espere la reconexión. **Desde T11**, cola y worker comparten la conexión normal, y el servicio comprueba que el cliente esté `ready` (`queue.getBackend().client.status`, API de BullMQ 6) antes de `add`. Verificado en ambos casos: 503 en milisegundos, y 202 otra vez al volver Redis.
+- `waypoints` admite como máximo 100 paradas (cada una es un Dijkstra en el worker). `JOB_RETENTION_SECONDS` (24 h por defecto) se valida al arrancar.
+- `ROUTE_QUEUE` vive en `routing.constants.ts` para evitar un import circular entre el módulo y el servicio.
 
 **Qué se construye:**
 - `OptimizeRouteDto`:
@@ -355,7 +360,13 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/dto/optimize-route.dto.ts`, `routing.controller.ts`, `routing.service.ts`, `routing.module.ts`, spec.
 **Tamaño:** M.
 
-### [ ] T11: Worker `RouteProcessor`
+### [x] T11: Worker `RouteProcessor`
+
+**Ajustes al implementar:**
+- Las opciones de `@Processor(...)` se evalúan al importar el archivo, antes de cargar el `.env`. Por eso la concurrencia se aplica en `onApplicationBootstrap` (`worker.concurrency = WORKER_CONCURRENCY`, 4 por defecto). `PEAK_HOURS` se valida al arrancar con el mismo `parsePeakHours` del algoritmo.
+- El worker usa la conexión compartida, con cola offline, para esperar a Redis. El fallo rápido del productor pasó al servicio (ver T10).
+- `durationMs` mide solo `findRoute` y se redondea a microsegundos. El tipo `Edge` del algoritmo acepta `maxWeight: null`, como se guarda en la base.
+- Verificado con la app real: los 2 jobs pendientes de T10 se procesaron al arrancar. El caso 1 da `A→C→D→E`, 30. `INVALID_NODE` y `ROUTE_BLOCKED_BY_CONSTRAINTS` quedan `completed` con `{ error }` y `attemptsMade = 1`. Con Postgres caído y el grafo fuera de caché, el job queda `failed` tras 3 intentos (~3 s). Con Redis caído el worker sobrevive y reanuda solo. `failedReason` puede quedar vacío (el `AggregateError` de `pg` no tiene mensaje); T12 expone `INTERNAL_ERROR` con un mensaje genérico.
 
 **Qué se construye:**
 - `@Processor('route')` que extiende `WorkerHost`, con concurrencia `WORKER_CONCURRENCY`.
@@ -382,7 +393,13 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/routing/route.processor.ts`, spec, `routing.module.ts`.
 **Tamaño:** S.
 
-### [ ] T12: `GET /route/status/:jobId`
+### [x] T12: `GET /route/status/:jobId`
+
+**Ajustes al implementar:**
+- Solo se aceptan ids con formato `job-<uuid>` (los que emite la API); cualquier otro da 404 sin consultar Redis. BullMQ arma la clave como `bull:route:<id>`, y un id como `meta` apuntaría a otra estructura interna de la cola.
+- `getState()` también puede devolver `'unknown'`, que se trata como 404. Con Redis caído responde 503, con la misma comprobación que el encolado.
+- Un job en espera de reintento queda `delayed` y se muestra `PENDING`. `INTERNAL_ERROR` lleva un mensaje genérico, sin detalles internos.
+- Verificado con la app real: upload → optimize → `PENDING` (cola pausada) → `COMPLETED` con `A→C→D→E`. `NO_ROUTE` sale como `FAILED` con su código. Con Postgres caído: `PENDING` durante los reintentos y luego `FAILED` / `INTERNAL_ERROR`. 404 para ids desconocidos o mal formados. `PROCESSING` dura milisegundos y está cubierto por la prueba unitaria.
 
 **Qué se construye:**
 - `queue.getJob(jobId)` + `job.getState()`, con este mapeo:
@@ -412,9 +429,9 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Tamaño:** S.
 
 ### Checkpoint 4: Funcionalidad completa
-- [ ] Desde Swagger salen los 3 casos del README de punta a punta, más un caso con error (`FAILED` con su código).
-- [ ] Todos los tests unitarios en verde.
-- [ ] Revisión contigo.
+- [x] Desde Swagger salen los 3 casos del README de punta a punta, más un caso con error (`FAILED` con su código): caso 1 `A→C→D→E` 30, casos 2 y 3 `A→B→D→E` 32, camión de 9000 kg `ROUTE_BLOCKED_BY_CONSTRAINTS`.
+- [x] Todos los tests unitarios en verde (166/166).
+- [x] Revisión contigo (PR de la fase 4).
 
 ---
 
@@ -522,7 +539,7 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 | Al terminar la hora pico, salir más tarde puede hacerte llegar antes. Con eso, Dijkstra sin esperas puede no dar el óptimo en casos de borde | Medio | Documentarlo como limitación conocida y agregar un test que fije el comportamiento elegido |
 | Instalar sin versión un paquete `@nestjs/*` trae la v12 (solo ESM) y rompe Jest en CommonJS | Alto | Instalar siempre la línea de Nest 11 (`npm view <pkg>@<major> type` debe estar vacío) |
 | Los workers de BullMQ necesitan `maxRetriesPerRequest: null` en la conexión de Redis | Bajo | Verificado en la documentación de BullMQ: solo hace falta si se pasa una instancia de ioredis propia. Como pasamos opciones (`{ url }`), BullMQ lo configura solo. Confirmarlo en T11 |
-| Si Redis se cae en ejecución, `queue.add` puede quedarse esperando (por defecto, 20 reintentos por comando) y el `POST /route/optimize` tardaría en responder | Medio | Revisarlo en T10 |
+| ~~Si Redis se cae en ejecución, `queue.add` puede quedarse esperando~~ | — | **Resuelto en T10:** `enableOfflineQueue: false` en la cola; responde 503 al instante |
 | El repo está en una ruta de OneDrive (el usuario confirma que no sincroniza) | Bajo | Si `npm install` se vuelve lento o da errores de archivos bloqueados (`EPERM`/`EBUSY`), revisar OneDrive primero |
 | Los tests e2e son inestables por el polling asíncrono | Bajo | Polling con tiempo límite y BD y cola aisladas para test |
 | `nest new` en un repo que ya tiene archivos | Bajo | Generar en una carpeta temporal y mover, o usar `--skip-git` con cuidado de no sobrescribir `README.md` ni `.gitignore` |
