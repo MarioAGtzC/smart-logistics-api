@@ -241,7 +241,13 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 
 ## Fase 3: Redes (Postgres + caché)
 
-### [ ] T7: Entidades, migración y `POST /network/upload`
+### [x] T7: Entidades, migración y `POST /network/upload`
+
+**Ajustes al implementar:**
+- Las entidades se llaman `GraphEntity` y `EdgeEntity`, para no chocar con la interfaz `Edge` del algoritmo. La migración vive en `src/database/migrations/` (carpeta de T2).
+- Con 10 000 aristas, un solo `save` con cascade excedía el límite de Postgres de 65 535 parámetros por consulta (`500`). Ahora se usa una transacción explícita: se guarda el grafo y las aristas se insertan en lotes de 1000. Verificado con la base real: 10 000 aristas en ~1.6 s, y un fallo en el segundo lote deshace todo.
+- Un nombre de nodo con el carácter NUL (`\u0000`) daba `500`, porque Postgres lo rechaza en `text`. Ahora el DTO lo rechaza con `400` (`@NotContains`).
+- `nodes` se guarda en orden de primera aparición.
 
 **Qué se construye:**
 - Entidades `Graph` y `Edge` (relación 1-N con `ON DELETE CASCADE` e índice en `graph_id`).
@@ -267,7 +273,9 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `src/network/entities/graph.entity.ts`, `edge.entity.ts`, `src/network/dto/upload-network.dto.ts`, `network.service.ts`, `network.controller.ts`, `network.module.ts`, `src/migrations/*`.
 **Tamaño:** M.
 
-### [ ] T8: `GET /network/nodes/:id`
+### [x] T8: `GET /network/nodes/:id`
+
+**Ajuste al implementar:** cargar las aristas con `relations` (un JOIN) repetía el arreglo `nodes` del grafo en cada fila de arista. Con 10 000 aristas, la app se quedó sin memoria (más de 2 GB) y se cayó. `relationLoadStrategy: 'query'` no admite ordenar la relación en TypeORM 1.1 (error de SQL). `getGraph` hace ahora dos consultas simples: el grafo con `findOneBy` y sus aristas con `find` por `graph_id`, ordenadas por `id`. Verificado: 10 000 aristas en ~90 ms; `GET /network/nodes` responde en ~0.09 s.
 
 **Qué se construye:**
 - `NetworkService.getGraph(id)` carga el grafo con sus aristas.
@@ -284,7 +292,12 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Archivos:** `network.controller.ts`, `network.service.ts`, `dto/network-nodes.response.dto.ts`, spec.
 **Tamaño:** XS.
 
-### [ ] T9: Caché del grafo en Redis
+### [x] T9: Caché del grafo en Redis
+
+**Ajustes al implementar:**
+- Versiones: `@nestjs/cache-manager@3` (última para Nest 11), `cache-manager@7`, y **`keyv@5` + `@keyv/redis@5`**. Con Keyv 6, Nest no reconoce el store (busca la propiedad `opts`, que Keyv 6 ya no tiene). Lo envolvía en un segundo Keyv sin listener de errores, y la app **se caía al apagar Redis**.
+- El store vive en `src/network/graph-cache.store.ts`. Tiene un listener de `error` que solo deja una advertencia, y `disableOfflineQueue: true`, para que con Redis caído los comandos fallen de inmediato en vez de esperar la reconexión.
+- Verificado con la app real: con Postgres apagado, un grafo en caché responde 200 en ~3 ms. Con Redis apagado, la API sigue respondiendo desde Postgres sin esperas y Redis se reconecta solo.
 
 **Qué se construye:**
 - `CacheModule.registerAsync` con el store `@keyv/redis`.
@@ -306,9 +319,9 @@ El algoritmo (T3–T6) va primero porque es la parte con más riesgo y la que m�
 **Tamaño:** S.
 
 ### Checkpoint 3: Redes
-- [ ] Desde Swagger: subir el grafo del README y leer sus nodos.
-- [ ] Con `redis-cli KEYS graph:*` se ve la clave después de leer el grafo.
-- [ ] Revisión contigo.
+- [x] Desde Swagger: subir el grafo del README y leer sus nodos (201 y luego 200 con `["A","B","C","D","E"]`).
+- [x] Con `redis-cli KEYS graph:*` se ve la clave después de leer el grafo.
+- [x] Revisión contigo (PR de la fase 3).
 
 ---
 
